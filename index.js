@@ -10,7 +10,7 @@ app.use(
   cors({
     origin: [process.env.CLIENT_URL || "http://localhost:3000"],
     credentials: true,
-  })
+  }),
 );
 app.use(express.json());
 
@@ -30,7 +30,6 @@ app.get("/", (req, res) => {
   res.send("BookNook server is running");
 });
 
-// Start locally; on Vercel the exported app is used instead
 if (!process.env.VERCEL) {
   client
     .connect()
