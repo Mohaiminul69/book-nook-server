@@ -109,6 +109,59 @@ app.get("/borrows", verifyToken, async (req, res) => {
   }
 });
 
+app.post("/borrows", verifyToken, async (req, res) => {
+  const { bookId } = req.body;
+  if (!ObjectId.isValid(bookId)) {
+    return res.status(400).send({ message: "Invalid book" });
+  }
+
+  try {
+    const alreadyBorrowed = await borrowsCollection.findOne({
+      bookId,
+      userEmail: req.user.email,
+    });
+    if (alreadyBorrowed) {
+      return res.status(409).send({
+        code: "ALREADY_BORROWED",
+        message:
+          "You already have this book. Return it before borrowing again.",
+      });
+    }
+
+    const book = await booksCollection.findOneAndUpdate(
+      { _id: new ObjectId(bookId), availableCopies: { $gt: 0 } },
+      { $inc: { availableCopies: -1 } },
+      { returnDocument: "after" },
+    );
+    if (!book) {
+      return res.status(409).send({
+        code: "NOT_AVAILABLE",
+        message: "Every copy is out right now.",
+      });
+    }
+
+    const borrowDate = new Date();
+    const returnDate = new Date(borrowDate);
+    returnDate.setDate(returnDate.getDate() + 7);
+
+    const borrow = {
+      bookId,
+      bookTitle: book.title,
+      bookAuthor: book.author,
+      bookImage: book.image,
+      bookCategory: book.category,
+      userEmail: req.user.email,
+      userName: req.user.name,
+      borrowDate,
+      returnDate,
+    };
+    const result = await borrowsCollection.insertOne(borrow);
+    res.status(201).send({ _id: result.insertedId, ...borrow });
+  } catch {
+    res.status(500).send({ message: "Could not borrow the book" });
+  }
+});
+
 if (!process.env.VERCEL) {
   client
     .connect()
