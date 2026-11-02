@@ -56,6 +56,30 @@ app.get("/", (req, res) => {
   res.send("BookNook server is running");
 });
 
+app.get("/books", async (req, res) => {
+  const { category, email, limit } = req.query;
+  const query = {};
+  if (category && category !== "All") {
+    query.category = category;
+  }
+  if (email) {
+    query["addedBy.email"] = email;
+  }
+
+  let cursor = booksCollection.find(query).sort({ createdAt: -1 });
+  const max = parseInt(limit);
+  if (max > 0) {
+    cursor = cursor.limit(max);
+  }
+
+  try {
+    const books = await cursor.toArray();
+    res.send(books);
+  } catch {
+    res.status(500).send({ message: "Could not load books" });
+  }
+});
+
 if (!process.env.VERCEL) {
   client
     .connect()
