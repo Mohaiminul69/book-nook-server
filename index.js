@@ -97,6 +97,44 @@ app.get("/books/:id", verifyToken, async (req, res) => {
   }
 });
 
+const CATEGORIES = ["Fiction", "Science", "History", "Kids", "Others"];
+
+app.post("/books", verifyToken, async (req, res) => {
+  const { title, author, category, image, description, totalCopies } = req.body;
+  const copies = parseInt(totalCopies);
+
+  if (!title?.trim() || !author?.trim() || !description?.trim()) {
+    return res
+      .status(400)
+      .send({ message: "Title, author and description are required" });
+  }
+  if (!CATEGORIES.includes(category)) {
+    return res.status(400).send({ message: "Choose a valid category" });
+  }
+  if (!(copies >= 1)) {
+    return res.status(400).send({ message: "Total copies must be at least 1" });
+  }
+
+  const book = {
+    title: title.trim(),
+    author: author.trim(),
+    category,
+    image: image || "",
+    description: description.trim(),
+    totalCopies: copies,
+    availableCopies: copies,
+    addedBy: { name: req.user.name, email: req.user.email },
+    createdAt: new Date(),
+  };
+
+  try {
+    const result = await booksCollection.insertOne(book);
+    res.status(201).send({ _id: result.insertedId, ...book });
+  } catch {
+    res.status(500).send({ message: "Could not add the book" });
+  }
+});
+
 app.get("/borrows", verifyToken, async (req, res) => {
   try {
     const borrows = await borrowsCollection
