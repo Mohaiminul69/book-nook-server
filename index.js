@@ -1,7 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
-import { MongoClient, ServerApiVersion } from "mongodb";
+import { MongoClient, ObjectId, ServerApiVersion } from "mongodb";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 
 const app = express();
@@ -77,6 +77,23 @@ app.get("/books", async (req, res) => {
     res.send(books);
   } catch {
     res.status(500).send({ message: "Could not load books" });
+  }
+});
+
+app.get("/books/:id", verifyToken, async (req, res) => {
+  const { id } = req.params;
+  if (!ObjectId.isValid(id)) {
+    return res.status(404).send({ message: "Book not found" });
+  }
+
+  try {
+    const book = await booksCollection.findOne({ _id: new ObjectId(id) });
+    if (!book) {
+      return res.status(404).send({ message: "Book not found" });
+    }
+    res.send(book);
+  } catch {
+    res.status(500).send({ message: "Could not load the book" });
   }
 });
 
