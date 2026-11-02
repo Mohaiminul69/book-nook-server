@@ -97,6 +97,18 @@ app.get("/books/:id", verifyToken, async (req, res) => {
   }
 });
 
+app.get("/borrows", verifyToken, async (req, res) => {
+  try {
+    const borrows = await borrowsCollection
+      .find({ userEmail: req.user.email })
+      .sort({ borrowDate: -1 })
+      .toArray();
+    res.send(borrows);
+  } catch {
+    res.status(500).send({ message: "Could not load borrows" });
+  }
+});
+
 if (!process.env.VERCEL) {
   client
     .connect()
