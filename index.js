@@ -135,6 +135,80 @@ app.post("/books", verifyToken, async (req, res) => {
   }
 });
 
+const findOwnBook = async (req, res) => {
+  const { id } = req.params;
+  if (!ObjectId.isValid(id)) {
+    res.status(404).send({ message: "Book not found" });
+    return null;
+  }
+  const book = await booksCollection.findOne({ _id: new ObjectId(id) });
+  if (!book) {
+    res.status(404).send({ message: "Book not found" });
+    return null;
+  }
+  if (book.addedBy?.email !== req.user.email) {
+    res.status(403).send({ message: "You can only change books you added" });
+    return null;
+  }
+  return book;
+};
+
+app.patch("/books/:id", verifyToken, async (req, res) => {
+  try {
+    const book = await findOwnBook(req, res);
+    if (!book) return;
+
+    const { title, author, category, description, totalCopies } = req.body;
+    const copies = parseInt(totalCopies);
+    const borrowedCopies = book.totalCopies - book.availableCopies;
+
+    if (!title?.trim() || !author?.trim() || !description?.trim()) {
+      return res
+        .status(400)
+        .send({ message: "Title, author and description are required" });
+    }
+    if (!CATEGORIES.includes(category)) {
+      return res.status(400).send({ message: "Choose a valid category" });
+    }
+    if (!(copies >= 1)) {
+      return res
+        .status(400)
+        .send({ message: "Total copies must be at least 1" });
+    }
+    if (copies < borrowedCopies) {
+      return res.status(400).send({
+        message: `${borrowedCopies} copies are borrowed right now, so total copies can't go below that`,
+      });
+    }
+
+    const updates = {
+      title: title.trim(),
+      author: author.trim(),
+      category,
+      description: description.trim(),
+      totalCopies: copies,
+      availableCopies: copies - borrowedCopies,
+    };
+    await booksCollection.updateOne({ _id: book._id }, { $set: updates });
+    res.send({ ...book, ...updates });
+  } catch {
+    res.status(500).send({ message: "Could not update the book" });
+  }
+});
+
+app.delete("/books/:id", verifyToken, async (req, res) => {
+  try {
+    const book = await findOwnBook(req, res);
+    if (!book) return;
+
+    await booksCollection.deleteOne({ _id: book._id });
+    await borrowsCollection.deleteMany({ bookId: book._id.toString() });
+    res.send({ message: "Book deleted", title: book.title });
+  } catch {
+    res.status(500).send({ message: "Could not delete the book" });
+  }
+});
+
 app.get("/borrows", verifyToken, async (req, res) => {
   try {
     const borrows = await borrowsCollection
