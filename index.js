@@ -162,6 +162,31 @@ app.post("/borrows", verifyToken, async (req, res) => {
   }
 });
 
+app.delete("/borrows/:id", verifyToken, async (req, res) => {
+  const { id } = req.params;
+  if (!ObjectId.isValid(id)) {
+    return res.status(404).send({ message: "Borrow not found" });
+  }
+
+  try {
+    const borrow = await borrowsCollection.findOneAndDelete({
+      _id: new ObjectId(id),
+      userEmail: req.user.email,
+    });
+    if (!borrow) {
+      return res.status(404).send({ message: "Borrow not found" });
+    }
+
+    await booksCollection.updateOne(
+      { _id: new ObjectId(borrow.bookId) },
+      { $inc: { availableCopies: 1 } },
+    );
+    res.send({ message: "Book returned", bookTitle: borrow.bookTitle });
+  } catch {
+    res.status(500).send({ message: "Could not return the book" });
+  }
+});
+
 if (!process.env.VERCEL) {
   client
     .connect()
